@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#1a5c3a">
+    <title>Censo Karene</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(r => console.log('SW registrado', r.scope))
+            .catch(e => console.log('SW error', e));
+        });
+      }
+    </script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --verde: #1a5c3a;
+            --verde-claro: #2d8a5e;
+            --verde-pale: #e8f5ee;
+            --gris: #6b7280;
+            --gris-claro: #f3f4f6;
+            --borde: #d1d5db;
+            --texto: #111827;
+            --rojo: #dc2626;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gris-claro);
+            color: var(--texto);
+            min-height: 100vh;
+            font-size: 16px;
+        }
+        .header {
+            background: var(--verde);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .header h1 { font-size: 18px; font-weight: 600; flex: 1; }
+        .header-back {
+            background: none; border: none; color: white;
+            font-size: 22px; cursor: pointer; padding: 4px; line-height: 1;
+        }
+        .header-action {
+            background: rgba(255,255,255,0.2); border: none; color: white;
+            font-size: 14px; cursor: pointer; padding: 6px 12px; border-radius: 6px;
+            font-weight: 600;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* HOME */
+        .home-stats {
+            background: white; margin: 12px; border-radius: 12px;
+            padding: 16px; display: flex; gap: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat { flex: 1; text-align: center; }
+        .stat-num { font-size: 28px; font-weight: 700; color: var(--verde); }
+        .stat-label { font-size: 12px; color: var(--gris); margin-top: 2px; }
+        .search-bar { margin: 0 12px 12px; position: relative; }
+        .search-bar input {
+            width: 100%; padding: 12px 16px 12px 42px;
+            border: 1px solid var(--borde); border-radius: 10px;
+            font-size: 16px; background: white; outline: none;
+        }
+        .search-bar::before {
+            content: '🔍'; position: absolute; left: 14px;
+            top: 50%; transform: translateY(-50%); font-size: 16px;
+        }
+        .home-actions { padding: 0 12px 12px; }
+
+        /* BUTTONS */
+        .btn-primary {
+            background: var(--verde); color: white; border: none;
+            border-radius: 10px; padding: 14px 20px; font-size: 16px;
+            font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-secondary {
+            background: white; color: var(--verde); border: 2px solid var(--verde);
+            border-radius: 10px; padding: 12px 20px; font-size: 15px;
+            font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 8px;
+        }
+        .btn-danger {
+            background: var(--rojo); color: white; border: none;
+            border-radius: 10px; padding: 12px 20px; font-size: 15px;
+            font-weight: 600; cursor: pointer; width: 100%;
+        }
+
+        /* PERSON LIST */
+        .person-list { padding: 0 12px 80px; }
+        .person-card {
+            background: white; border-radius: 10px; padding: 14px;
+            margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .person-card:active { background: var(--verde-pale); }
+        .person-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--verde-pale); display: flex; align-items: center;
+            justify-content: center; font-size: 20px; flex-shrink: 0;
+        }
+        .person-avatar.externo { background: #fef3c7; }
+        .person-info { flex: 1; min-width: 0; }
+        .person-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .person-meta { font-size: 13px; color: var(--gris); margin-top: 2px; }
+        .person-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .badge { font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+        .badge-clan { background: #dbeafe; color: #1d4ed8; }
+        .badge-res { background: #dcfce7; color: #15803d; }
+        .badge-ext { background: #fef3c7; color: #92400e; }
+
+        /* FORM */
+        .form-container { padding: 12px 12px 100px; }
+        .form-section {
+            background: white; border-radius: 12px; padding: 16px;
+            margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .form-section-title {
+            font-size: 12px; font-weight: 700; color: var(--verde);
+            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px;
+        }
+        .field { margin-bottom: 16px; }
+        .field:last-child { margin-bottom: 0; }
+        .field label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+        .field input[type="text"],
+        .field input[type="number"],
+        .field select,
+        .field textarea {
+            width: 100%; padding: 11px 14px; border: 1px solid var(--borde);
+            border-radius: 8px; font-size: 16px; background: white;
+            outline: none; -webkit-appearance: none; appearance: none;
+        }
+        .field input:focus, .field select:focus, .field textarea:focus {
+            border-color: var(--verde-claro);
+            box-shadow: 0 0 0 3px rgba(45,138,94,0.15);
+        }
+        .radio-group, .check-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .radio-option input, .check-option input { display: none; }
+        .radio-option label, .check-option label {
+            display: inline-block; padding: 8px 14px; border: 1.5px solid var(--borde);
+            border-radius: 8px; font-size: 14px; cursor: pointer; background: white;
+            font-weight: 400; margin-bottom: 0; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .radio-option input:checked + label,
+        .check-option input:checked + label {
+            background: var(--verde); color: white; border-color: var(--verde);
+        }
+
+        /* ACTIVIDADES */
+        .actividad-item { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+        .actividad-header { display: flex; align-items: center; padding: 12px; gap: 10px; background: white; }
+        .actividad-header input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--verde); flex-shrink: 0; }
+        .actividad-header span { font-size: 15px; font-weight: 500; }
+        .actividad-sub { display: none; padding: 12px; background: var(--verde-pale); border-top: 1px solid var(--borde); }
+        .actividad-sub.visible { display: block; }
+        .equipo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .equipo-row label { flex: 1; font-size: 14px; }
+        .equipo-row input { width: 65px; padding: 8px 10px; border: 1px solid var(--borde); border-radius: 6px; font-size: 15px; text-align: center; }
+
+        /* MODALES */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white; border-radius: 20px 20px 0 0;
+            padding: 20px; width: 100%; max-height: 85vh; overflow-y: auto;
+        }
+        .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+        .divider { height: 1px; background: var(--borde); margin: 14px 0; }
+
+        /* AUSENTES */
+        .ausente-card { border: 1px solid var(--borde); border-radius: 8px; padding: 12px; margin-bottom: 8px; position: relative; }
+        .ausente-remove { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--rojo); font-size: 22px; cursor: pointer; line-height: 1; }
+
+        /* VÍNCULOS */
+        .vinculos-list { padding: 12px 12px 80px; }
+        .vinculo-item {
+            background: white; border-radius: 10px; padding: 14px;
+            margin-bottom: 8px; display: flex; align-items: center;
+            justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .vinculo-names { font-size: 14px; font-weight: 500; }
+        .vinculo-tipo { font-size: 12px; color: var(--gris); margin-top: 2px; }
+        .btn-sm-danger { background: #fee2e2; color: var(--rojo); border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500; }
+
+        /* EXPORT */
+        .export-screen { padding: 12px 12px 80px; }
+        .export-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .export-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .export-card p { font-size: 13px; color: var(--gris); margin-bottom: 14px; line-height: 1.5; }
+
+        /* TOAST */
+        .toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #1f2937; color: white; padding: 12px 20px;
+            border-radius: 10px; font-size: 14px; z-index: 300;
+            opacity: 0; transition: all 0.25s; white-space: nowrap; pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* EMPTY STATE */
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--gris); }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 15px; line-height: 1.5; }
+
+        /* CÓNYUGE DISPLAY */
+        .conyuge-display {
+            padding: 11px 14px; border: 1px solid var(--borde); border-radius: 8px;
+            min-height: 44px; background: #f9fafb; font-size: 14px;
+        }
+        .btn-inline {
+            margin-top: 8px; background: white; color: var(--verde);
+            border: 1.5px solid var(--verde); border-radius: 8px;
+            padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL: CÓNYUGE -->
+<div class="modal-overlay" id="modal-conyuge">
+    <div class="modal">
+        <div class="modal-title">Vincular cónyuge</div>
+        <div class="field">
+            <label>Buscar persona ya registrada</label>
+            <input type="text" id="cs-buscar" placeholder="Escribir nombre..." oninput="buscarConyuge(this.value)">
+        </div>
+        <div id="cs-resultados"></div>
+        <div class="divider"></div>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px;">O registrar cónyuge externo/a:</p>
+        <div class="field">
+            <label>Nombre completo</label>
+            <input type="text" id="ce-nombre" placeholder="Nombre y apellidos">
+        </div>
+        <div style="display:flex;gap:10px">
+            <div class="field" style="flex:1">
+                <label>Edad</label>
+                <input type="number" id="ce-edad" placeholder="Años" min="0" max="120">
+            </div>
+            <div class="field" style="flex:1">
+                <label>Procedencia</label>
+                <input type="text" id="ce-procedencia" placeholder="Lugar">
+            </div>
+        </div>
+        <div class="field">
+            <label>Etnicidad</label>
+            <div class="radio-group">
+                <div class="radio-option"><input type="radio" name="ce-etnia" id="ce-mes" value="Mestizo/a"><label for="ce-mes">Mestizo/a</label></div>
+                <div class="radio-option"><input type="radio" name="ce-etnia" id="ce-ara" value="Arakmbut"><label for="ce-ara">Arakmbut</label></div>
+                <div class="radio-option"><input type="radio" name="ce-etnia" id="ce-otr" value="Otro"><label for="ce-otr">Otro</label></div>
+            </div>
+        </div>
+        <button class="btn-primary" onclick="crearConyugeExterno()">Crear y vincular</button>
+        <button class="btn-secondary" onclick="cerrarModalConyuge()">Cancelar</button>
+    </div>
+</div>
+
+<!-- MODAL: VÍNCULO GENEALÓGICO -->
+<div class="modal-overlay" id="modal-vinculo">
+    <div class="modal">
+        <div class="modal-title" id="mv-titulo">Seleccionar primera persona</div>
+        <div class="field" id="mv-buscar-field">
+            <input type="text" id="mv-buscar" placeholder="Escribir nombre..." oninput="buscarParaVinculo(this.value)">
+        </div>
+        <div id="mv-resultados"></div>
+        <div class="field" id="mv-tipo-field" style="display:none">
+            <label>Tipo de vínculo</label>
+            <div class="radio-group" id="mv-tipo-group"></div>
+        </div>
+        <button class="btn-primary" id="mv-confirmar" style="display:none" onclick="confirmarVinculo()">Confirmar vínculo</button>
+        <button class="btn-secondary" onclick="cerrarModalVinculo()">Cancelar</button>
+    </div>
+</div>
+
+<!-- ==================== HOME ==================== -->
+<div class="screen active" id="screen-home">
+    <div class="header">
+        <h1>Censo Karene</h1>
+        <button class="header-action" onclick="showScreen('screen-export')">Exportar</button>
+    </div>
+    <div class="home-stats">
+        <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Personas</div></div>
+        <div class="stat"><div class="stat-num" id="stat-ext">0</div><div class="stat-label">Externos</div></div>
+        <div class="stat"><div class="stat-num" id="stat-vinculos">0</div><div class="stat-label">Vínculos</div></div>
+    </div>
+    <div class="home-actions">
+        <button class="btn-primary" onclick="nuevaPersona()">＋ Nueva persona</button>
+        <button class="btn-secondary" onclick="showScreen('screen-vinculos')">Gestionar vínculos genealógicos</button>
+    </div>
+    <div class="search-bar">
+        <input type="text" placeholder="Buscar persona..." oninput="filtrarPersonas(this.value)" id="home-search">
+    </div>
+    <div class="person-list" id="person-list"></div>
+</div>
+
+<!-- ==================== FORMULARIO ==================== -->
+<div class="screen" id="screen-form">
+    <div class="header">
+        <button class="header-back" onclick="volverHome()">←</button>
+        <h1 id="form-titulo">Nueva persona</h1>
+        <button class="header-action" onclick="guardarPersona()">Guardar</button>
+    </div>
+    <div class="form-container">
+        <input type="hidden" id="f-id">
+
+        <!-- DATOS BÁSICOS -->
+        <div class="form-section">
+            <div class="form-section-title">Datos básicos</div>
+            <div class="field">
+                <label>Nombre completo *</label>
+                <input type="text" id="f-nombre" placeholder="Nombre(s) Apellido1 Apellido2">
+            </div>
+            <div class="field">
+                <label>Género *</label>
+                <div class="radio-group">
+                    <div class="radio-option"><input type="radio" name="f-genero" id="fg-m" value="Masculino"><label for="fg-m">Masculino</label></div>
+                    <div class="radio-option"><input type="radio" name="f-genero" id="fg-f" value="Femenino"><label for="fg-f">Femenino</label></div>
+                    <div class="radio-option"><input type="radio" name="f-genero" id="fg-o" value="Otro"><label for="fg-o">Otro</label></div>
+                </div>
+            </div>
+            <div class="field">
+                <label>Edad</label>
+                <input type="number" id="f-edad" placeholder="Años" min="0" max="120">
+            </div>
+            <div class="field">
+                <label>Clan</label>
+                <select id="f-clan">
+                    <option value="">— No especificado —</option>
+                    <option value="Yaromba">Yaromba</option>
+                    <option value="Idsikambut">Idsikambut</option>
+                    <option value="Masenawa">Masenawa</option>
+                    <option value="Wandigpana">Wandigpana</option>
+                    <option value="Sapiteri">Sapiteri</option>
+                    <option value="Singperi">Singperi</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Residencia *</label>
+                <div class="radio-group">
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-nr" value="NR"><label for="fr-nr">NR</label></div>
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-gr" value="GR"><label for="fr-gr">GR</label></div>
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-cm" value="CM"><label for="fr-cm">CM</label></div>
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-d1" value="Delta1"><label for="fr-d1">Delta 1</label></div>
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-vi" value="VI"><label for="fr-vi">VI</label></div>
+                    <div class="radio-option"><input type="radio" name="f-res" id="fr-fe" value="Fuera/estudios"><label for="fr-fe">Fuera/estudios</label></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UNIÓN Y FAMILIA -->
+        <div class="form-section">
+            <div class="form-section-title">Unión y familia</div>
+            <div class="field">
+                <label>Estado civil *</label>
+                <div class="radio-group">
+                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-ca" value="Casado/a" onchange="toggleUnion()"><label for="ec-ca">Casado/a</label></div>
+                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-so" value="Soltero/a" onchange="toggleUnion()"><label for="ec-so">Soltero/a</label></div>
+                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-di" value="Divorciado/a" onchange="toggleUnion()"><label for="ec-di">Divorciado/a</label></div>
+                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-vi" value="Viudo/a" onchange="toggleUnion()"><label for="ec-vi">Viudo/a</label></div>
+                </div>
+            </div>
+            <div id="union-fields" style="display:none">
+                <div class="field">
+                    <label>Tipo de unión</label>
+                    <div class="radio-group">
+                        <div class="radio-option"><input type="radio" name="f-union" id="tu-end" value="Endógama"><label for="tu-end">Endógama</label></div>
+                        <div class="radio-option"><input type="radio" name="f-union" id="tu-int" value="Intercomunal"><label for="tu-int">Intercomunal</label></div>
+                        <div class="radio-option"><input type="radio" name="f-union" id="tu-mix" value="Mixta"><label for="tu-mix">Mixta</label></div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Año / período de unión</label>
+                    <input type="text" id="f-anio-union" placeholder="Ej: 2012, aprox. 30 años, ~2005">
+                </div>
+                <div class="field">
+                    <label>Procedencia de la pareja</label>
+                    <input type="text" id="f-proc" placeholder="Lugar de origen">
+                </div>
+                <div class="field">
+                    <label>Cónyuge</label>
+                    <div class="conyuge-display"><span id="conyuge-display-txt" style="color:var(--gris)">No vinculado</span></div>
+                    <button type="button" class="btn-inline" onclick="abrirModalConyuge()">Vincular cónyuge</button>
+                    <input type="hidden" id="f-conyuge-id">
+                </div>
+            </div>
+        </div>
+
+        <!-- EDUCACIÓN -->
+        <div class="form-section">
+            <div class="form-section-title">Educación</div>
+            <div class="field">
+                <div class="radio-group">
+                    <div class="radio-option"><input type="radio" name="f-edu" id="ed-pri" value="Primaria"><label for="ed-pri">Primaria</label></div>
+                    <div class="radio-option"><input type="radio" name="f-edu" id="ed-sec" value="Secundaria"><label for="ed-sec">Secundaria</label></div>
+                    <div class="radio-option"><input type="radio" name="f-edu" id="ed-si" value="Sup. incompleta"><label for="ed-si">Sup. incompleta</label></div>
+                    <div class="radio-option"><input type="radio" name="f-edu" id="ed-sc" value="Sup. completa"><label for="ed-sc">Sup. completa</label></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ACTIVIDADES -->
+        <div class="form-section">
+            <div class="form-section-title">Actividades económicas</div>
+
+            <div class="actividad-item">
+                <div class="actividad-header">
+                    <input type="checkbox" id="act-min" onchange="toggleSub('sub-min',this.checked)">
+                    <span>⛏️ Minería</span>
+                </div>
+                <div class="actividad-sub" id="sub-min">
+                    <div class="field">
+                        <label>Rol</label>
+                        <div class="radio-group">
+                            <div class="radio-option"><input type="radio" name="f-min-rol" id="mr-peon" value="Peón/traquero" onchange="toggleEquipos(false)"><label for="mr-peon">Peón/traquero</label></div>
+                            <div class="radio-option"><input type="radio" name="f-min-rol" id="mr-dueno" value="Dueño de equipo" onchange="toggleEquipos(true)"><label for="mr-dueno">Dueño de equipo</label></div>
+                            <div class="radio-option"><input type="radio" name="f-min-rol" id="mr-fam" value="Op. familiar" onchange="toggleEquipos(true)"><label for="mr-fam">Op. familiar</label></div>
+                        </div>
+                    </div>
+                    <div id="equipos-fields" style="display:none">
+                        <div class="equipo-row"><label>Minichupaderas</label><input type="number" id="eq-mini" min="0" max="99" value="0"></div>
+                        <div class="equipo-row"><label>Carancheras</label><input type="number" id="eq-cara" min="0" max="99" value="0"></div>
+                        <div class="equipo-row"><label>Tracas</label><input type="number" id="eq-traca" min="0" max="99" value="0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header">
+                    <input type="checkbox" id="act-chacra" onchange="toggleSub('sub-chacra',this.checked)">
+                    <span>🌱 Chacra</span>
+                </div>
+                <div class="actividad-sub" id="sub-chacra">
+                    <div style="display:flex;gap:10px">
+                        <div class="field" style="flex:0 0 90px">
+                            <label>N° chacras</label>
+                            <input type="number" id="eq-chacra-n" min="1" max="99" value="1">
+                        </div>
+                        <div class="field" style="flex:1">
+                            <label>Cultivos</label>
+                            <input type="text" id="eq-chacra-cult" placeholder="yuca, plátano...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header"><input type="checkbox" id="act-tienda"><span>🏪 Tienda</span></div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header"><input type="checkbox" id="act-cocinera"><span>🍳 Cocinera en campamento</span></div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header">
+                    <input type="checkbox" id="act-pesca" onchange="toggleSub('sub-pesca',this.checked)">
+                    <span>🎣 Pesca</span>
+                </div>
+                <div class="actividad-sub" id="sub-pesca">
+                    <div class="radio-group">
+                        <div class="radio-option"><input type="radio" name="f-pesca" id="pf-reg" value="Regular"><label for="pf-reg">Regular</label></div>
+                        <div class="radio-option"><input type="radio" name="f-pesca" id="pf-oca" value="Ocasional"><label for="pf-oca">Ocasional</label></div>
+                        <div class="radio-option"><input type="radio" name="f-pesca" id="pf-esp" value="Esporádica"><label for="pf-esp">Esporádica</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header">
+                    <input type="checkbox" id="act-caza" onchange="toggleSub('sub-caza',this.checked)">
+                    <span>🏹 Caza</span>
+                </div>
+                <div class="actividad-sub" id="sub-caza">
+                    <div class="radio-group">
+                        <div class="radio-option"><input type="radio" name="f-caza" id="cf-reg" value="Regular"><label for="cf-reg">Regular</label></div>
+                        <div class="radio-option"><input type="radio" name="f-caza" id="cf-oca" value="Ocasional"><label for="cf-oca">Ocasional</label></div>
+                        <div class="radio-option"><input type="radio" name="f-caza" id="cf-esp" value="Esporádica"><label for="cf-esp">Esporádica</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header"><input type="checkbox" id="act-estudios"><span>📚 Estudios</span></div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header"><input type="checkbox" id="act-prof"><span>💼 Profesional / Empleado</span></div>
+            </div>
+
+            <div class="actividad-item">
+                <div class="actividad-header">
+                    <input type="checkbox" id="act-otras" onchange="toggleSub('sub-otras',this.checked)">
+                    <span>➕ Otras actividades</span>
+                </div>
+                <div class="actividad-sub" id="sub-otras">
+                    <div class="check-group" style="margin-bottom:10px">
+                        <div class="check-option"><input type="checkbox" id="ot-piscig"><label for="ot-piscig">Piscigranja</label></div>
+                        <div class="check-option"><input type="checkbox" id="ot-ganad"><label for="ot-ganad">Ganadería</label></div>
+                        <div class="check-option"><input type="checkbox" id="ot-cacao"><label for="ot-cacao">Cacao</label></div>
+                        <div class="check-option"><input type="checkbox" id="ot-cerv"><label for="ot-cerv">Venta de cerveza</label></div>
+                    </div>
+                    <div class="field">
+                        <label>Otra (especificar)</label>
+                        <input type="text" id="ot-otro" placeholder="...">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIEMBROS AUSENTES -->
+        <div class="form-section">
+            <div class="form-section-title">Miembros ausentes del hogar</div>
+            <div id="ausentes-list"></div>
+            <button type="button" class="btn-inline" onclick="agregarAusente({})">＋ Añadir miembro ausente</button>
+        </div>
+
+        <!-- NOTAS -->
+        <div class="form-section">
+            <div class="form-section-title">Notas</div>
+            <div class="field">
+                <textarea id="f-notas" rows="3" placeholder="Observaciones..." style="resize:vertical"></textarea>
+            </div>
+        </div>
+
+        <div id="delete-section" style="display:none;padding-bottom:12px">
+            <button type="button" class="btn-danger" onclick="eliminarPersona()">Eliminar esta persona</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== VÍNCULOS ==================== -->
+<div class="screen" id="screen-vinculos">
+    <div class="header">
+        <button class="header-back" onclick="showScreen('screen-home')">←</button>
+        <h1>Vínculos genealógicos</h1>
+        <button class="header-action" onclick="abrirModalVinculo()">＋ Añadir</button>
+    </div>
+    <div class="vinculos-list">
+        <div style="margin-bottom:12px">
+            <input type="text" placeholder="Filtrar por nombre..." oninput="filtrarVinculos(this.value)"
+                style="width:100%;padding:11px 14px;border:1px solid var(--borde);border-radius:8px;font-size:16px;outline:none">
+        </div>
+        <div id="vinculos-container"></div>
+    </div>
+</div>
+
+<!-- ==================== EXPORTAR ==================== -->
+<div class="screen" id="screen-export">
+    <div class="header">
+        <button class="header-back" onclick="showScreen('screen-home')">←</button>
+        <h1>Exportar / Respaldo</h1>
+    </div>
+    <div class="export-screen">
+        <div class="export-card">
+            <h3>📋 CSV — Individuos</h3>
+            <p>Todos los registros con datos demográficos, económicos y familiares. Abrir en Excel o importar a R/SPSS.</p>
+            <button class="btn-primary" onclick="exportCSVIndividuos()">Descargar individuos.csv</button>
+        </div>
+        <div class="export-card">
+            <h3>🔗 CSV — Vínculos / Red</h3>
+            <p>Red de relaciones entre personas. Compatible con Gephi (formato edge list).</p>
+            <button class="btn-primary" onclick="exportCSVVinculos()">Descargar vinculos.csv</button>
+        </div>
+        <div class="export-card">
+            <h3>💾 Respaldo completo (JSON)</h3>
+            <p>Exporta todos los datos para transferir a otro dispositivo o hacer copia de seguridad.</p>
+            <button class="btn-secondary" onclick="exportBackup()">Descargar backup.json</button>
+            <button class="btn-secondary" onclick="document.getElementById('import-input').click()">Importar backup.json</button>
+            <input type="file" id="import-input" accept=".json" style="display:none" onchange="importBackup(this)">
+        </div>
+        <div class="export-card" style="border:2px solid #fecaca">
+            <h3>⚠️ Borrar todos los datos</h3>
+            <p>Elimina permanentemente todo el censo del dispositivo. Haz un respaldo antes.</p>
+            <button class="btn-danger" onclick="borrarTodo()">Borrar todo</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== BASE DE DATOS ====================
+const KEY = 'censo_karene_v1';
+
+function db() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || { personas: [], vinculos: [] }; }
+    catch(e) { return { personas: [], vinculos: [] }; }
+}
+function saveDB(data) { localStorage.setItem(KEY, JSON.stringify(data)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+// ==================== NAVEGACIÓN ====================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+    if (id === 'screen-home') renderHome();
+    if (id === 'screen-vinculos') renderVinculos();
+}
+
+// ==================== HOME ====================
+function renderHome(q = '') {
+    const d = db();
+    const personas = q
+        ? d.personas.filter(p => p.nombre.toLowerCase().includes(q.toLowerCase()))
+        : [...d.personas].sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    document.getElementById('stat-total').textContent = d.personas.length;
+    document.getElementById('stat-ext').textContent = d.personas.filter(p => p.externo).length;
+    document.getElementById('stat-vinculos').textContent = d.vinculos.length;
+
+    const list = document.getElementById('person-list');
+    if (!personas.length) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">👥</div><p>${q ? 'Sin resultados para "' + q + '"' : 'Aún no hay personas registradas.'}</p></div>`;
+        return;
+    }
+    list.innerHTML = personas.map(p => {
+        const icon = p.externo ? '🌍' : (p.genero === 'Femenino' ? '👩' : '👨');
+        const badges = [
+            p.clan ? `<span class="badge badge-clan">${p.clan}</span>` : '',
+            p.residencia ? `<span class="badge badge-res">${p.residencia}</span>` : '',
+            p.externo ? `<span class="badge badge-ext">Externo</span>` : ''
+        ].join('');
+        const meta = [p.edad ? p.edad + ' años' : '', p.estadoCivil].filter(Boolean).join(' · ');
+        return `<div class="person-card" onclick="editarPersona('${p.id}')">
+            <div class="person-avatar${p.externo ? ' externo' : ''}">${icon}</div>
+            <div class="person-info">
+                <div class="person-name">${p.nombre}</div>
+                ${meta ? `<div class="person-meta">${meta}</div>` : ''}
+                ${badges ? `<div class="person-badges">${badges}</div>` : ''}
+            </div>
+            <span style="color:#9ca3af;font-size:20px">›</span>
+        </div>`;
+    }).join('');
+}
+
+function filtrarPersonas(v) { renderHome(v); }
+
+// ==================== FORMULARIO ====================
+let _ausenteIdx = 0;
+
+function nuevaPersona() {
+    resetForm();
+    document.getElementById('form-titulo').textContent = 'Nueva persona';
+    document.getElementById('f-id').value = '';
+    document.getElementById('delete-section').style.display = 'none';
+    showScreen('screen-form');
+}
+
+function editarPersona(id) {
+    const d = db();
+    const p = d.personas.find(x => x.id === id);
+    if (!p) return;
+    resetForm();
+    document.getElementById('form-titulo').textContent = 'Editar persona';
+    document.getElementById('f-id').value = id;
+    document.getElementById('delete-section').style.display = 'block';
+
+    setVal('f-nombre', p.nombre);
+    setVal('f-edad', p.edad || '');
+    setVal('f-clan', p.clan || '');
+    setVal('f-anio-union', p.anioUnion || '');
+    setVal('f-proc', p.procedenciaPareja || '');
+    setVal('f-notas', p.notas || '');
+    if (p.genero) setRadio('f-genero', p.genero);
+    if (p.residencia) setRadio('f-res', p.residencia);
+    if (p.estadoCivil) { setRadio('f-ec', p.estadoCivil); toggleUnion(); }
+    if (p.tipoUnion) setRadio('f-union', p.tipoUnion);
+    if (p.nivelEducativo) setRadio('f-edu', p.nivelEducativo);
+    if (p.conyugeId) {
+        document.getElementById('f-conyuge-id').value = p.conyugeId;
+        const c = d.personas.find(x => x.id === p.conyugeId);
+        setConyugeDisplay(c ? c.nombre : 'Cónyuge vinculado');
+    }
+    const a = p.actividades || {};
+    if (a.mineria) {
+        check('act-min', true); toggleSub('sub-min', true);
+        if (a.mineria.rol) setRadio('f-min-rol', a.mineria.rol);
+        if (a.mineria.equipos) {
+            const e = a.mineria.equipos;
+            setVal('eq-mini', e.minichupadera || 0);
+            setVal('eq-cara', e.caranchera || 0);
+            setVal('eq-traca', e.traca || 0);
+            if (a.mineria.rol !== 'Peón/traquero') toggleEquipos(true);
+        }
+    }
+    if (a.chacra) {
+        check('act-chacra', true); toggleSub('sub-chacra', true);
+        setVal('eq-chacra-n', a.chacra.num || 1);
+        setVal('eq-chacra-cult', a.chacra.cultivos || '');
+    }
+    if (a.tienda) check('act-tienda', true);
+    if (a.cocinera) check('act-cocinera', true);
+    if (a.estudios) check('act-estudios', true);
+    if (a.profesional) check('act-prof', true);
+    if (a.pesca) { check('act-pesca', true); toggleSub('sub-pesca', true); setRadio('f-pesca', a.pesca); }
+    if (a.caza)  { check('act-caza', true);  toggleSub('sub-caza',  true); setRadio('f-caza',  a.caza);  }
+    if (a.otras) {
+        check('act-otras', true); toggleSub('sub-otras', true);
+        if (a.otras.piscigranja) check('ot-piscig', true);
+        if (a.otras.ganaderia)   check('ot-ganad',  true);
+        if (a.otras.cacao)       check('ot-cacao',  true);
+        if (a.otras.cerveza)     check('ot-cerv',   true);
+        if (a.otras.otro)        setVal('ot-otro', a.otras.otro);
+    }
+    (p.ausentes || []).forEach(au => agregarAusente(au));
+    showScreen('screen-form');
+}
+
+function resetForm() {
+    document.getElementById('f-nombre').value = '';
+    document.getElementById('f-edad').value = '';
+    document.getElementById('f-clan').value = '';
+    document.getElementById('f-anio-union').value = '';
+    document.getElementById('f-proc').value = '';
+    document.getElementById('f-notas').value = '';
+    document.getElementById('f-conyuge-id').value = '';
+    document.getElementById('eq-mini').value = 0;
+    document.getElementById('eq-cara').value = 0;
+    document.getElementById('eq-traca').value = 0;
+    document.getElementById('eq-chacra-n').value = 1;
+    document.getElementById('eq-chacra-cult').value = '';
+    document.getElementById('ot-otro').value = '';
+    document.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
+    ['act-min','act-chacra','act-tienda','act-cocinera','act-pesca','act-caza',
+     'act-estudios','act-prof','act-otras','ot-piscig','ot-ganad','ot-cacao','ot-cerv']
+        .forEach(id => check(id, false));
+    ['sub-min','sub-chacra','sub-pesca','sub-caza','sub-otras']
+        .forEach(id => document.getElementById(id).classList.remove('visible'));
+    document.getElementById('equipos-fields').style.display = 'none';
+    document.getElementById('union-fields').style.display = 'none';
+    setConyugeDisplay(null);
+    document.getElementById('ausentes-list').innerHTML = '';
+    _ausenteIdx = 0;
+}
+
+function guardarPersona() {
+    const nombre = document.getElementById('f-nombre').value.trim();
+    if (!nombre) { toast('⚠️ El nombre es obligatorio'); return; }
+    const d = db();
+    const existingId = document.getElementById('f-id').value;
+    const id = existingId || uid();
+    const isNew = !existingId;
+    const ec = getRadio('f-ec');
+    const conyugeId = document.getElementById('f-conyuge-id').value || null;
+    const a = {};
+    if (document.getElementById('act-min').checked) {
+        a.mineria = {
+            rol: getRadio('f-min-rol'),
+            equipos: { minichupadera: +document.getElementById('eq-mini').value||0,
+                       caranchera: +document.getElementById('eq-cara').value||0,
+                       traca: +document.getElementById('eq-traca').value||0 }
+        };
+    }
+    if (document.getElementById('act-chacra').checked)
+        a.chacra = { num: +document.getElementById('eq-chacra-n').value||1, cultivos: document.getElementById('eq-chacra-cult').value.trim() };
+    if (document.getElementById('act-tienda').checked)   a.tienda = true;
+    if (document.getElementById('act-cocinera').checked) a.cocinera = true;
+    if (document.getElementById('act-estudios').checked) a.estudios = true;
+    if (document.getElementById('act-prof').checked)     a.profesional = true;
+    if (document.getElementById('act-pesca').checked)    a.pesca = getRadio('f-pesca');
+    if (document.getElementById('act-caza').checked)     a.caza  = getRadio('f-caza');
+    if (document.getElementById('act-otras').checked)
+        a.otras = { piscigranja: document.getElementById('ot-piscig').checked,
+                    ganaderia:   document.getElementById('ot-ganad').checked,
+                    cacao:       document.getElementById('ot-cacao').checked,
+                    cerveza:     document.getElementById('ot-cerv').checked,
+                    otro:        document.getElementById('ot-otro').value.trim() };
+
+    const ausentes = [];
+    document.querySelectorAll('.ausente-entry').forEach(el => {
+        const idx = el.dataset.idx;
+        ausentes.push({
+            nombre:  document.getElementById('au-n-'+idx).value.trim(),
+            edad:    document.getElementById('au-e-'+idx).value,
+            lugar:   document.getElementById('au-l-'+idx).value,
+            motivo:  document.getElementById('au-m-'+idx).value
+        });
+    });
+
+    const p = {
+        id, nombre,
+        genero:           getRadio('f-genero'),
+        edad:             +document.getElementById('f-edad').value || null,
+        clan:             document.getElementById('f-clan').value || null,
+        residencia:       getRadio('f-res'),
+        estadoCivil:      ec,
+        tipoUnion:        ec === 'Casado/a' ? getRadio('f-union') : null,
+        anioUnion:        ec === 'Casado/a' ? document.getElementById('f-anio-union').value.trim() : '',
+        procedenciaPareja:ec === 'Casado/a' ? document.getElementById('f-proc').value.trim() : '',
+        conyugeId,
+        nivelEducativo:   getRadio('f-edu'),
+        actividades:      a,
+        ausentes,
+        notas:            document.getElementById('f-notas').value.trim(),
+        externo:          false,
+        fechaRegistro:    isNew ? new Date().toISOString()
+                                : (d.personas.find(x=>x.id===id)?.fechaRegistro || new Date().toISOString())
+    };
+
+    if (isNew) d.personas.push(p);
+    else { const i = d.personas.findIndex(x=>x.id===id); if (i>=0) d.personas[i] = {...d.personas[i],...p}; }
+
+    // Sincronizar cónyuge bidireccional
+    if (conyugeId) {
+        const c = d.personas.find(x=>x.id===conyugeId);
+        if (c && !c.conyugeId) c.conyugeId = id;
+        const ya = d.vinculos.find(v => v.tipo==='conyuge' &&
+            ((v.persona1Id===id && v.persona2Id===conyugeId)||(v.persona1Id===conyugeId && v.persona2Id===id)));
+        if (!ya) d.vinculos.push({ id: uid(), persona1Id: id, persona2Id: conyugeId, tipo: 'conyuge' });
+    }
+
+    saveDB(d);
+    toast(isNew ? '✓ Persona guardada' : '✓ Cambios guardados');
+    volverHome();
+}
+
+function eliminarPersona() {
+    if (!confirm('¿Eliminar esta persona? No se puede deshacer.')) return;
+    const id = document.getElementById('f-id').value;
+    const d = db();
+    d.personas = d.personas.filter(p => p.id !== id);
+    d.vinculos = d.vinculos.filter(v => v.persona1Id !== id && v.persona2Id !== id);
+    d.personas.forEach(p => { if (p.conyugeId === id) p.conyugeId = null; });
+    saveDB(d);
+    toast('Persona eliminada');
+    volverHome();
+}
+
+function volverHome() {
+    document.getElementById('home-search').value = '';
+    showScreen('screen-home');
+}
+
+// ==================== TOGGLES ====================
+function toggleUnion() {
+    const v = getRadio('f-ec');
+    document.getElementById('union-fields').style.display = (v === 'Casado/a') ? 'block' : 'none';
+}
+function toggleSub(id, show) {
+    const el = document.getElementById(id);
+    show ? el.classList.add('visible') : el.classList.remove('visible');
+}
+function toggleEquipos(show) {
+    document.getElementById('equipos-fields').style.display = show ? 'block' : 'none';
+}
+
+// ==================== AUSENTES ====================
+function agregarAusente(datos) {
+    const idx = _ausenteIdx++;
+    const div = document.createElement('div');
+    div.className = 'ausente-card ausente-entry';
+    div.dataset.idx = idx;
+    div.innerHTML = `
+        <button class="ausente-remove" onclick="this.parentElement.remove()">×</button>
+        <div class="field"><label>Nombre</label>
+            <input type="text" id="au-n-${idx}" value="${datos.nombre||''}" placeholder="Nombre completo"></div>
+        <div class="field"><label>Edad</label>
+            <input type="number" id="au-e-${idx}" value="${datos.edad||''}" min="0" max="120" placeholder="Años"></div>
+        <div class="field"><label>Lugar de residencia</label>
+            <select id="au-l-${idx}">
+                <option value="">— Seleccionar —</option>
+                ${['Puerto Luz','Delta Uno','Puerto Maldonado','Lima','Cusco','Otro']
+                    .map(v=>`<option${datos.lugar===v?' selected':''}>${v}</option>`).join('')}
+            </select></div>
+        <div class="field"><label>Motivo</label>
+            <select id="au-m-${idx}">
+                <option value="">— Seleccionar —</option>
+                ${['Estudios','Trabajo','Matrimonio','Otro']
+                    .map(v=>`<option${datos.motivo===v?' selected':''}>${v}</option>`).join('')}
+            </select></div>`;
+    document.getElementById('ausentes-list').appendChild(div);
+}
+
+// ==================== MODAL CÓNYUGE ====================
+function abrirModalConyuge() {
+    document.getElementById('cs-buscar').value = '';
+    document.getElementById('cs-resultados').innerHTML = '';
+    document.getElementById('ce-nombre').value = '';
+    document.getElementById('ce-edad').value = '';
+    document.getElementById('ce-procedencia').value = '';
+    document.querySelectorAll('input[name="ce-etnia"]').forEach(r => r.checked = false);
+    document.getElementById('modal-conyuge').classList.add('active');
+}
+function cerrarModalConyuge() { document.getElementById('modal-conyuge').classList.remove('active'); }
+
+function buscarConyuge(q) {
+    const d = db();
+    const currentId = document.getElementById('f-id').value;
+    const res = q.length < 2 ? [] :
+        d.personas.filter(p => p.id !== currentId && p.nombre.toLowerCase().includes(q.toLowerCase())).slice(0,5);
+    document.getElementById('cs-resultados').innerHTML = res.length
+        ? res.map(p => personaCardSmall(p, `vincularConyuge('${p.id}','${esc(p.nombre)}')`)).join('')
+        : (q.length >= 2 ? '<p style="color:var(--gris);font-size:13px;padding:6px 0">Sin resultados</p>' : '');
+}
+
+function vincularConyuge(id, nombre) {
+    document.getElementById('f-conyuge-id').value = id;
+    setConyugeDisplay(nombre);
+
+    // Heredar campos de unión del cónyuge si los tiene y los nuestros están vacíos
+    const d = db();
+    const c = d.personas.find(x => x.id === id);
+    if (c) {
+        if (c.tipoUnion && !getRadio('f-union')) setRadio('f-union', c.tipoUnion);
+        if (c.anioUnion && !document.getElementById('f-anio-union').value.trim())
+            setVal('f-anio-union', c.anioUnion);
+        if (c.procedenciaPareja && !document.getElementById('f-proc').value.trim())
+            setVal('f-proc', c.procedenciaPareja);
+    }
+
+    cerrarModalConyuge();
+    toast('✓ Cónyuge vinculado — datos de unión heredados');
+}
+
+function crearConyugeExterno() {
+    const nombre = document.getElementById('ce-nombre').value.trim();
+    if (!nombre) { toast('Ingresa el nombre'); return; }
+    const d = db();
+    const newId = uid();
+    d.personas.push({
+        id: newId, nombre,
+        genero: null, edad: +document.getElementById('ce-edad').value || null,
+        clan: null, residencia: null, estadoCivil: 'Casado/a',
+        tipoUnion: null, procedenciaPareja: document.getElementById('ce-procedencia').value.trim(),
+        conyugeId: document.getElementById('f-id').value || null,
+        nivelEducativo: null, actividades: {}, ausentes: [],
+        notas: 'Persona externa. Etnia: ' + (getRadio('ce-etnia') || '—'),
+        externo: true, fechaRegistro: new Date().toISOString()
+    });
+    saveDB(d);
+    vincularConyuge(newId, nombre);
+}
+
+function setConyugeDisplay(nombre) {
+    const el = document.getElementById('conyuge-display-txt');
+    if (nombre) { el.textContent = nombre; el.style.color = 'var(--texto)'; }
+    else { el.textContent = 'No vinculado'; el.style.color = 'var(--gris)'; }
+}
+
+// ==================== MODAL VÍNCULOS ====================
+let _vp1 = null, _vp2 = null;
+
+function abrirModalVinculo() {
+    _vp1 = null; _vp2 = null;
+    document.getElementById('mv-buscar').value = '';
+    document.getElementById('mv-resultados').innerHTML = '';
+    document.getElementById('mv-tipo-field').style.display = 'none';
+    document.getElementById('mv-confirmar').style.display = 'none';
+    document.getElementById('mv-buscar-field').style.display = 'block';
+    document.getElementById('mv-titulo').textContent = 'Seleccionar primera persona';
+    document.getElementById('modal-vinculo').classList.add('active');
+}
+function cerrarModalVinculo() {
+    document.getElementById('modal-vinculo').classList.remove('active');
+    _vp1 = null; _vp2 = null;
+    document.getElementById('mv-buscar').value = '';
+}
+
+function buscarParaVinculo(q) {
+    const d = db();
+    const excl = [_vp1, _vp2].filter(Boolean);
+    const res = q.length < 2 ? [] :
+        d.personas.filter(p => !excl.includes(p.id) && p.nombre.toLowerCase().includes(q.toLowerCase())).slice(0,6);
+    document.getElementById('mv-resultados').innerHTML = res.length
+        ? res.map(p => personaCardSmall(p, `seleccionarVinculo('${p.id}')`)).join('')
+        : (q.length >= 2 ? '<p style="color:var(--gris);font-size:13px;padding:6px 0">Sin resultados</p>' : '');
+}
+
+function seleccionarVinculo(id) {
+    const d = db();
+    const p = d.personas.find(x => x.id === id);
+    if (!_vp1) {
+        _vp1 = id;
+        document.getElementById('mv-titulo').textContent = p.nombre + ' → seleccionar segunda persona';
+        document.getElementById('mv-buscar').value = '';
+        document.getElementById('mv-resultados').innerHTML = '';
+    } else {
+        _vp2 = id;
+        const p1 = d.personas.find(x => x.id === _vp1);
+        document.getElementById('mv-titulo').textContent = p1.nombre + ' y ' + p.nombre;
+        document.getElementById('mv-buscar-field').style.display = 'none';
+        document.getElementById('mv-resultados').innerHTML = '';
+        document.getElementById('mv-tipo-field').style.display = 'block';
+        document.getElementById('mv-tipo-group').innerHTML = [
+            ['conyuge','💍 Cónyuge'],['padre','👨 Padre/Madre de'],
+            ['hijo','👶 Hijo/a de'],['hermano','👫 Hermano/a']
+        ].map(([v,l],i)=>`<div class="radio-option"><input type="radio" name="mv-tipo" id="mvt${i}" value="${v}"><label for="mvt${i}">${l}</label></div>`).join('');
+        document.getElementById('mv-confirmar').style.display = 'block';
+    }
+}
+
+function confirmarVinculo() {
+    const tipo = getRadio('mv-tipo');
+    if (!tipo) { toast('Selecciona el tipo de vínculo'); return; }
+    const d = db();
+    const ya = d.vinculos.find(v => v.tipo === tipo &&
+        ((v.persona1Id===_vp1 && v.persona2Id===_vp2)||(v.persona1Id===_vp2 && v.persona2Id===_vp1)));
+    if (ya) { toast('Este vínculo ya existe'); return; }
+    d.vinculos.push({ id: uid(), persona1Id: _vp1, persona2Id: _vp2, tipo });
+    if (tipo === 'conyuge') {
+        const p1 = d.personas.find(x=>x.id===_vp1);
+        const p2 = d.personas.find(x=>x.id===_vp2);
+        if (p1 && !p1.conyugeId) p1.conyugeId = _vp2;
+        if (p2 && !p2.conyugeId) p2.conyugeId = _vp1;
+    }
+    saveDB(d);
+    cerrarModalVinculo();
+    renderVinculos();
+    toast('✓ Vínculo añadido');
+}
+
+function eliminarVinculo(id) {
+    if (!confirm('¿Eliminar este vínculo?')) return;
+    const d = db();
+    const v = d.vinculos.find(x=>x.id===id);
+    if (v?.tipo === 'conyuge') {
+        const p1 = d.personas.find(x=>x.id===v.persona1Id);
+        const p2 = d.personas.find(x=>x.id===v.persona2Id);
+        if (p1) p1.conyugeId = null;
+        if (p2) p2.conyugeId = null;
+    }
+    d.vinculos = d.vinculos.filter(x=>x.id!==id);
+    saveDB(d);
+    renderVinculos();
+    toast('Vínculo eliminado');
+}
+
+function renderVinculos(q = '') {
+    const d = db();
+    const LABELS = { conyuge:'💍 Cónyuge', padre:'👨 Padre/Madre', hijo:'👶 Hijo/a', hermano:'👫 Hermano/a' };
+    const vinculos = q
+        ? d.vinculos.filter(v => {
+            const p1 = d.personas.find(p=>p.id===v.persona1Id);
+            const p2 = d.personas.find(p=>p.id===v.persona2Id);
+            return p1?.nombre.toLowerCase().includes(q.toLowerCase()) || p2?.nombre.toLowerCase().includes(q.toLowerCase());
+          })
+        : d.vinculos;
+    const cont = document.getElementById('vinculos-container');
+    if (!vinculos.length) {
+        cont.innerHTML = `<div class="empty-state"><div class="icon">🔗</div><p>${q ? 'Sin resultados' : 'No hay vínculos registrados.\nUsa el botón + para añadir.'}</p></div>`;
+        return;
+    }
+    cont.innerHTML = vinculos.map(v => {
+        const p1 = d.personas.find(p=>p.id===v.persona1Id);
+        const p2 = d.personas.find(p=>p.id===v.persona2Id);
+        return `<div class="vinculo-item">
+            <div>
+                <div class="vinculo-names">${p1?.nombre||'?'} — ${p2?.nombre||'?'}</div>
+                <div class="vinculo-tipo">${LABELS[v.tipo]||v.tipo}</div>
+            </div>
+            <button class="btn-sm-danger" onclick="eliminarVinculo('${v.id}')">Eliminar</button>
+        </div>`;
+    }).join('');
+}
+
+function filtrarVinculos(q) { renderVinculos(q); }
+
+// ==================== EXPORT ====================
+function exportCSVIndividuos() {
+    const d = db();
+    const H = ['ID','Nombre','Género','Edad','Clan','Residencia','Estado civil',
+                'Tipo unión','Procedencia pareja','ID cónyuge','Nombre cónyuge',
+                'Nivel educativo','Año/período unión','Min. rol','Minichupaderas','Carancheras','Tracas',
+                'Chacra','N° chacras','Cultivos','Tienda','Cocinera',
+                'Pesca','Caza','Estudios','Profesional',
+                'Piscigranja','Ganadería','Cacao','Venta cerveza','Otra actividad',
+                'N° ausentes','Externo','Notas','Fecha registro'];
+    const rows = d.personas.map(p => {
+        const c = p.conyugeId ? d.personas.find(x=>x.id===p.conyugeId) : null;
+        const a = p.actividades || {};
+        return [
+            p.id, p.nombre, p.genero||'', p.edad||'', p.clan||'', p.residencia||'',
+            p.estadoCivil||'', p.tipoUnion||'', p.anioUnion||'', p.procedenciaPareja||'',
+            p.conyugeId||'', c?.nombre||'', p.nivelEducativo||'',
+            a.mineria?.rol||'', a.mineria?.equipos?.minichupadera??'', a.mineria?.equipos?.caranchera??'', a.mineria?.equipos?.traca??'',
+            a.chacra?'Sí':'No', a.chacra?.num||'', a.chacra?.cultivos||'',
+            a.tienda?'Sí':'No', a.cocinera?'Sí':'No',
+            a.pesca||'', a.caza||'',
+            a.estudios?'Sí':'No', a.profesional?'Sí':'No',
+            a.otras?.piscigranja?'Sí':'No', a.otras?.ganaderia?'Sí':'No',
+            a.otras?.cacao?'Sí':'No', a.otras?.cerveza?'Sí':'No', a.otras?.otro||'',
+            (p.ausentes||[]).length, p.externo?'Sí':'No', p.notas||'', p.fechaRegistro||''
+        ];
+    });
+    dlCSV('censo_karene_individuos.csv', H, rows);
+}
+
+function exportCSVVinculos() {
+    const d = db();
+    const H = ['ID relación','ID persona 1','Nombre persona 1','ID persona 2','Nombre persona 2','Tipo'];
+    const rows = d.vinculos.map(v => {
+        const p1 = d.personas.find(p=>p.id===v.persona1Id);
+        const p2 = d.personas.find(p=>p.id===v.persona2Id);
+        return [v.id, v.persona1Id, p1?.nombre||'?', v.persona2Id, p2?.nombre||'?', v.tipo];
+    });
+    dlCSV('censo_karene_vinculos.csv', H, rows);
+}
+
+function exportBackup() {
+    const blob = new Blob([JSON.stringify(db(), null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `censo_karene_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+}
+
+function importBackup(input) {
+    const f = input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data.personas)) throw new Error();
+            if (!confirm(`¿Importar? Esto reemplazará los datos actuales (${db().personas.length} personas) con los del backup (${data.personas.length} personas).`)) return;
+            saveDB(data); toast(`✓ Importado: ${data.personas.length} personas`); renderHome();
+        } catch { toast('Error: archivo inválido'); }
+    };
+    r.readAsText(f); input.value = '';
+}
+
+function borrarTodo() {
+    if (!confirm('¿Borrar TODOS los datos del censo?')) return;
+    if (!confirm('Confirmar: esta acción no se puede deshacer.')) return;
+    localStorage.removeItem(KEY); toast('Datos eliminados'); renderHome();
+}
+
+function dlCSV(filename, headers, rows) {
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==================== HELPERS ====================
+function getRadio(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value || null; }
+function setRadio(name, val) { const r = document.querySelector(`input[name="${name}"][value="${val}"]`); if(r) r.checked=true; }
+function setVal(id, val) { document.getElementById(id).value = val; }
+function check(id, val) { const el = document.getElementById(id); if(el) el.checked = val; }
+function esc(s) { return s.replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+
+function personaCardSmall(p, onclick) {
+    return `<div class="person-card" style="margin-bottom:6px" onclick="${onclick}">
+        <div class="person-avatar" style="width:36px;height:36px;font-size:16px">${p.externo?'🌍':p.genero==='Femenino'?'👩':'👨'}</div>
+        <div class="person-info">
+            <div class="person-name">${p.nombre}</div>
+            <div class="person-meta">${[p.edad?p.edad+' años':'',p.clan].filter(Boolean).join(' · ')}</div>
+        </div>
+    </div>`;
+}
+
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// Cerrar modales al tocar el overlay
+['modal-conyuge','modal-vinculo'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target === this) {
+            if (id === 'modal-conyuge') cerrarModalConyuge();
+            else cerrarModalVinculo();
+        }
+    });
+});
+
+// Init
+renderHome();
+</script>
+</body>
+</html>
