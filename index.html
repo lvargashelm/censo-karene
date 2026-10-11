@@ -378,7 +378,7 @@
                 <div class="radio-group">
                     <div class="radio-option"><input type="radio" name="f-ec" id="ec-ca" value="Casado/a" onchange="toggleUnion()"><label for="ec-ca">Casado/a</label></div>
                     <div class="radio-option"><input type="radio" name="f-ec" id="ec-so" value="Soltero/a" onchange="toggleUnion()"><label for="ec-so">Soltero/a</label></div>
-                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-di" value="Divorciado/a" onchange="toggleUnion()"><label for="ec-di">Divorciado/a</label></div>
+                    <div class="radio-option"><input type="radio" name="f-ec" id="ec-di" value="Separado/a" onchange="toggleUnion()"><label for="ec-di">Separado/a</label></div>
                     <div class="radio-option"><input type="radio" name="f-ec" id="ec-vi" value="Viudo/a" onchange="toggleUnion()"><label for="ec-vi">Viudo/a</label></div>
                 </div>
             </div>
@@ -394,6 +394,10 @@
                 <div class="field">
                     <label>Año / período de unión</label>
                     <input type="text" id="f-anio-union" placeholder="Ej: 2012, aprox. 30 años, ~2005">
+                </div>
+                <div class="field" id="anio-sep-field" style="display:none">
+                    <label>Año / período de separación</label>
+                    <input type="text" id="f-anio-sep" placeholder="Ej: 2018, hace 5 años">
                 </div>
                 <div class="field">
                     <label>Procedencia de la pareja</label>
@@ -683,6 +687,7 @@ function editarPersona(id) {
     setVal('f-edad', p.edad || '');
     setVal('f-clan', p.clan || '');
     setVal('f-anio-union', p.anioUnion || '');
+    setVal('f-anio-sep', p.anioSep || '');
     setVal('f-proc', p.procedenciaPareja || '');
     setVal('f-notas', p.notas || '');
     if (p.genero) setRadio('f-genero', p.genero);
@@ -735,6 +740,7 @@ function resetForm() {
     document.getElementById('f-edad').value = '';
     document.getElementById('f-clan').value = '';
     document.getElementById('f-anio-union').value = '';
+    document.getElementById('f-anio-sep').value = '';
     document.getElementById('f-proc').value = '';
     document.getElementById('f-notas').value = '';
     document.getElementById('f-conyuge-id').value = '';
@@ -808,9 +814,10 @@ function guardarPersona() {
         clan:             document.getElementById('f-clan').value || null,
         residencia:       getRadio('f-res'),
         estadoCivil:      ec,
-        tipoUnion:        ec === 'Casado/a' ? getRadio('f-union') : null,
-        anioUnion:        ec === 'Casado/a' ? document.getElementById('f-anio-union').value.trim() : '',
-        procedenciaPareja:ec === 'Casado/a' ? document.getElementById('f-proc').value.trim() : '',
+        tipoUnion:        (ec === 'Casado/a' || ec === 'Separado/a') ? getRadio('f-union') : null,
+        anioUnion:        (ec === 'Casado/a' || ec === 'Separado/a') ? document.getElementById('f-anio-union').value.trim() : '',
+        anioSep:          ec === 'Separado/a' ? document.getElementById('f-anio-sep').value.trim() : '',
+        procedenciaPareja:(ec === 'Casado/a' || ec === 'Separado/a') ? document.getElementById('f-proc').value.trim() : '',
         conyugeId,
         nivelEducativo:   getRadio('f-edu'),
         actividades:      a,
@@ -858,7 +865,9 @@ function volverHome() {
 // ==================== TOGGLES ====================
 function toggleUnion() {
     const v = getRadio('f-ec');
-    document.getElementById('union-fields').style.display = (v === 'Casado/a') ? 'block' : 'none';
+    const showUnion = (v === 'Casado/a' || v === 'Separado/a');
+    document.getElementById('union-fields').style.display = showUnion ? 'block' : 'none';
+    document.getElementById('anio-sep-field').style.display = (v === 'Separado/a') ? 'block' : 'none';
 }
 function toggleSub(id, show) {
     const el = document.getElementById(id);
@@ -1084,7 +1093,7 @@ function exportCSVIndividuos() {
     const d = db();
     const H = ['ID','Nombre','Género','Edad','Clan','Residencia','Estado civil',
                 'Tipo unión','Procedencia pareja','ID cónyuge','Nombre cónyuge',
-                'Nivel educativo','Año/período unión','Min. rol','Minichupaderas','Carancheras','Tracas',
+                'Nivel educativo','Año/período unión','Año/período separación','Min. rol','Minichupaderas','Carancheras','Tracas',
                 'Chacra','N° chacras','Cultivos','Tienda','Cocinera',
                 'Pesca','Caza','Estudios','Profesional',
                 'Piscigranja','Ganadería','Cacao','Venta cerveza','Otra actividad',
@@ -1094,7 +1103,7 @@ function exportCSVIndividuos() {
         const a = p.actividades || {};
         return [
             p.id, p.nombre, p.genero||'', p.edad||'', p.clan||'', p.residencia||'',
-            p.estadoCivil||'', p.tipoUnion||'', p.anioUnion||'', p.procedenciaPareja||'',
+            p.estadoCivil||'', p.tipoUnion||'', p.anioUnion||'', p.procedenciaPareja||'', p.anioSep||'',
             p.conyugeId||'', c?.nombre||'', p.nivelEducativo||'',
             a.mineria?.rol||'', a.mineria?.equipos?.minichupadera??'', a.mineria?.equipos?.caranchera??'', a.mineria?.equipos?.traca??'',
             a.chacra?'Sí':'No', a.chacra?.num||'', a.chacra?.cultivos||'',
