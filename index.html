@@ -382,9 +382,10 @@
                     <div class="radio-option"><input type="radio" name="f-ec" id="ec-vi" value="Viudo/a" onchange="toggleUnion()"><label for="ec-vi">Viudo/a</label></div>
                 </div>
             </div>
+            <!-- Unión actual (Casado/a) -->
             <div id="union-fields" style="display:none">
                 <div class="field">
-                    <label>Tipo de unión</label>
+                    <label>Tipo de unión actual</label>
                     <div class="radio-group">
                         <div class="radio-option"><input type="radio" name="f-union" id="tu-end" value="Endógama"><label for="tu-end">Endógama</label></div>
                         <div class="radio-option"><input type="radio" name="f-union" id="tu-int" value="Intercomunal"><label for="tu-int">Intercomunal</label></div>
@@ -394,10 +395,6 @@
                 <div class="field">
                     <label>Año / período de unión</label>
                     <input type="text" id="f-anio-union" placeholder="Ej: 2012, aprox. 30 años, ~2005">
-                </div>
-                <div class="field" id="anio-sep-field" style="display:none">
-                    <label>Año / período de separación</label>
-                    <input type="text" id="f-anio-sep" placeholder="Ej: 2018, hace 5 años">
                 </div>
                 <div class="field">
                     <label>Procedencia de la pareja</label>
@@ -410,6 +407,18 @@
                     <input type="hidden" id="f-conyuge-id">
                 </div>
             </div>
+
+            <!-- Relaciones para Separado/a -->
+            <div id="sep-fields" style="display:none">
+                <div id="relaciones-list"></div>
+                <button type="button" class="btn-secondary" style="margin-top:6px" onclick="agregarRelacion()">+ Agregar relación</button>
+            </div>
+
+            <!-- Uniones anteriores (solo para Casado/a) -->
+            <div id="uniones-ant-section" style="display:none">
+                <div id="uniones-ant-list"></div>
+                <button type="button" class="btn-secondary" style="margin-top:6px" onclick="agregarUnionAnterior()">+ Agregar unión anterior</button>
+            </div>
         </div>
 
         <!-- EDUCACIÓN -->
@@ -420,6 +429,7 @@
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-sin" value="Sin escolarizar"><label for="ed-sin">Sin escolarizar</label></div>
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-prii" value="Primaria incompleta"><label for="ed-prii">Primaria incompleta</label></div>
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-pri" value="Primaria"><label for="ed-pri">Primaria</label></div>
+                    <div class="radio-option"><input type="radio" name="f-edu" id="ed-seci" value="Secundaria incompleta"><label for="ed-seci">Secundaria incompleta</label></div>
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-sec" value="Secundaria"><label for="ed-sec">Secundaria</label></div>
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-si" value="Sup. incompleta"><label for="ed-si">Sup. incompleta</label></div>
                     <div class="radio-option"><input type="radio" name="f-edu" id="ed-sc" value="Sup. completa"><label for="ed-sc">Sup. completa</label></div>
@@ -687,13 +697,14 @@ function editarPersona(id) {
     setVal('f-edad', p.edad || '');
     setVal('f-clan', p.clan || '');
     setVal('f-anio-union', p.anioUnion || '');
-    setVal('f-anio-sep', p.anioSep || '');
     setVal('f-proc', p.procedenciaPareja || '');
     setVal('f-notas', p.notas || '');
     if (p.genero) setRadio('f-genero', p.genero);
     if (p.residencia) setRadio('f-res', p.residencia);
     if (p.estadoCivil) { setRadio('f-ec', p.estadoCivil); toggleUnion(); }
     if (p.tipoUnion) setRadio('f-union', p.tipoUnion);
+    if (p.unionesAnteriores?.length) _cargarUniones('uniones-ant-list', p.unionesAnteriores, 'Unión anterior ', false);
+    if (p.relaciones?.length) _cargarUniones('relaciones-list', p.relaciones, 'Relación ', true);
     if (p.nivelEducativo) setRadio('f-edu', p.nivelEducativo);
     if (p.conyugeId) {
         document.getElementById('f-conyuge-id').value = p.conyugeId;
@@ -740,8 +751,10 @@ function resetForm() {
     document.getElementById('f-edad').value = '';
     document.getElementById('f-clan').value = '';
     document.getElementById('f-anio-union').value = '';
-    document.getElementById('f-anio-sep').value = '';
     document.getElementById('f-proc').value = '';
+    document.getElementById('relaciones-list').innerHTML = '';
+    document.getElementById('uniones-ant-list').innerHTML = '';
+    _relIdx = 0; _antIdx = 0;
     document.getElementById('f-notas').value = '';
     document.getElementById('f-conyuge-id').value = '';
     document.getElementById('eq-mini').value = 0;
@@ -814,10 +827,11 @@ function guardarPersona() {
         clan:             document.getElementById('f-clan').value || null,
         residencia:       getRadio('f-res'),
         estadoCivil:      ec,
-        tipoUnion:        (ec === 'Casado/a' || ec === 'Separado/a') ? getRadio('f-union') : null,
-        anioUnion:        (ec === 'Casado/a' || ec === 'Separado/a') ? document.getElementById('f-anio-union').value.trim() : '',
-        anioSep:          ec === 'Separado/a' ? document.getElementById('f-anio-sep').value.trim() : '',
-        procedenciaPareja:(ec === 'Casado/a' || ec === 'Separado/a') ? document.getElementById('f-proc').value.trim() : '',
+        tipoUnion:        ec === 'Casado/a' ? getRadio('f-union') : null,
+        anioUnion:        ec === 'Casado/a' ? document.getElementById('f-anio-union').value.trim() : '',
+        procedenciaPareja:ec === 'Casado/a' ? document.getElementById('f-proc').value.trim() : '',
+        unionesAnteriores: ec === 'Casado/a' ? _leerUniones('uniones-ant-list') : [],
+        relaciones:        ec === 'Separado/a' ? _leerUniones('relaciones-list') : [],
         conyugeId,
         nivelEducativo:   getRadio('f-edu'),
         actividades:      a,
@@ -865,9 +879,88 @@ function volverHome() {
 // ==================== TOGGLES ====================
 function toggleUnion() {
     const v = getRadio('f-ec');
-    const showUnion = (v === 'Casado/a' || v === 'Separado/a');
-    document.getElementById('union-fields').style.display = showUnion ? 'block' : 'none';
-    document.getElementById('anio-sep-field').style.display = (v === 'Separado/a') ? 'block' : 'none';
+    document.getElementById('union-fields').style.display = (v === 'Casado/a') ? 'block' : 'none';
+    document.getElementById('uniones-ant-section').style.display = (v === 'Casado/a') ? 'block' : 'none';
+    document.getElementById('sep-fields').style.display = (v === 'Separado/a') ? 'block' : 'none';
+}
+
+function _unionBlock(idx, label, isSep) {
+    return `<div class="union-entry" data-uidx="${idx}" style="border:1px solid var(--borde);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong style="font-size:13px">${label}</strong>
+            <button type="button" onclick="eliminarUnion(${idx},'${isSep?'sep':'ant'}')" style="background:none;border:none;color:var(--rojo);font-size:18px;cursor:pointer">×</button>
+        </div>
+        <div class="field"><label>Tipo de unión</label>
+            <div class="radio-group">
+                <div class="radio-option"><input type="radio" name="u${idx}-tipo" value="Endógama"><label>Endógama</label></div>
+                <div class="radio-option"><input type="radio" name="u${idx}-tipo" value="Intercomunal"><label>Intercomunal</label></div>
+                <div class="radio-option"><input type="radio" name="u${idx}-tipo" value="Mixta"><label>Mixta</label></div>
+            </div>
+        </div>
+        <div class="field"><label>Nombre pareja</label><input type="text" id="u${idx}-pareja" placeholder="Nombre"></div>
+        <div class="field"><label>Año / período de unión</label><input type="text" id="u${idx}-inicio" placeholder="Ej: 2005"></div>
+        <div class="field"><label>Año / período de separación</label><input type="text" id="u${idx}-fin" placeholder="Ej: 2010"></div>
+        <div class="field"><label>Procedencia pareja</label><input type="text" id="u${idx}-proc" placeholder="Lugar de origen"></div>
+    </div>`;
+}
+
+let _relIdx = 0;
+let _antIdx = 0;
+
+function agregarRelacion() {
+    _relIdx++;
+    const div = document.createElement('div');
+    div.innerHTML = _unionBlock(_relIdx, 'Relación ' + _relIdx, true);
+    document.getElementById('relaciones-list').appendChild(div.firstChild);
+}
+
+function agregarUnionAnterior() {
+    _antIdx++;
+    const div = document.createElement('div');
+    div.innerHTML = _unionBlock('a'+_antIdx, 'Unión anterior ' + _antIdx, false);
+    document.getElementById('uniones-ant-list').appendChild(div.firstChild);
+}
+
+function eliminarUnion(idx, tipo) {
+    const list = tipo === 'sep' ? 'relaciones-list' : 'uniones-ant-list';
+    const entry = document.querySelector(`#${list} [data-uidx="${idx}"]`);
+    if (entry) entry.remove();
+}
+
+function _leerUniones(listId) {
+    const result = [];
+    document.querySelectorAll(`#${listId} .union-entry`).forEach(el => {
+        const idx = el.dataset.uidx;
+        const tipoRadio = el.querySelector(`input[name="u${idx}-tipo"]:checked`);
+        result.push({
+            tipo: tipoRadio ? tipoRadio.value : null,
+            pareja: (document.getElementById('u'+idx+'-pareja')?.value||'').trim(),
+            anioInicio: (document.getElementById('u'+idx+'-inicio')?.value||'').trim(),
+            anioFin: (document.getElementById('u'+idx+'-fin')?.value||'').trim(),
+            proc: (document.getElementById('u'+idx+'-proc')?.value||'').trim()
+        });
+    });
+    return result;
+}
+
+function _cargarUniones(listId, data, label, isSep, idxBase) {
+    const container = document.getElementById(listId);
+    container.innerHTML = '';
+    (data||[]).forEach((u, i) => {
+        const idx = isSep ? (i+1) : ('a'+(i+1));
+        if (isSep) _relIdx = i+1; else _antIdx = i+1;
+        const div = document.createElement('div');
+        div.innerHTML = _unionBlock(idx, label + (i+1), isSep);
+        const node = div.firstChild;
+        container.appendChild(node);
+        const tipoInput = node.querySelector(`input[name="u${idx}-tipo"][value="${u.tipo}"]`);
+        if (tipoInput) tipoInput.checked = true;
+        const setPf = (id, v) => { const el = document.getElementById(id); if(el) el.value = v||''; };
+        setPf('u'+idx+'-pareja', u.pareja);
+        setPf('u'+idx+'-inicio', u.anioInicio);
+        setPf('u'+idx+'-fin', u.anioFin);
+        setPf('u'+idx+'-proc', u.proc);
+    });
 }
 function toggleSub(id, show) {
     const el = document.getElementById(id);
@@ -1093,7 +1186,7 @@ function exportCSVIndividuos() {
     const d = db();
     const H = ['ID','Nombre','Género','Edad','Clan','Residencia','Estado civil',
                 'Tipo unión','Procedencia pareja','ID cónyuge','Nombre cónyuge',
-                'Nivel educativo','Año/período unión','Año/período separación','Min. rol','Minichupaderas','Carancheras','Tracas',
+                'Nivel educativo','Año/período unión','Uniones anteriores (JSON)','Relaciones (JSON)','Min. rol','Minichupaderas','Carancheras','Tracas',
                 'Chacra','N° chacras','Cultivos','Tienda','Cocinera',
                 'Pesca','Caza','Estudios','Profesional',
                 'Piscigranja','Ganadería','Cacao','Venta cerveza','Otra actividad',
@@ -1103,7 +1196,9 @@ function exportCSVIndividuos() {
         const a = p.actividades || {};
         return [
             p.id, p.nombre, p.genero||'', p.edad||'', p.clan||'', p.residencia||'',
-            p.estadoCivil||'', p.tipoUnion||'', p.anioUnion||'', p.procedenciaPareja||'', p.anioSep||'',
+            p.estadoCivil||'', p.tipoUnion||'', p.anioUnion||'', p.procedenciaPareja||'',
+            p.unionesAnteriores?.length ? JSON.stringify(p.unionesAnteriores) : '',
+            p.relaciones?.length ? JSON.stringify(p.relaciones) : '',
             p.conyugeId||'', c?.nombre||'', p.nivelEducativo||'',
             a.mineria?.rol||'', a.mineria?.equipos?.minichupadera??'', a.mineria?.equipos?.caranchera??'', a.mineria?.equipos?.traca??'',
             a.chacra?'Sí':'No', a.chacra?.num||'', a.chacra?.cultivos||'',
